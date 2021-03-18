@@ -4,8 +4,11 @@ import newspaper
 from newspaper import Article
 import pandas as pd
 from sqlalchemy import create_engine
-
 from datetime import datetime
+
+logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
+
+logfile.write('starting\n\n')
 
 with open('secrets.json') as file:
     secrets = json.load(file)
@@ -13,7 +16,8 @@ with open('secrets.json') as file:
     client_id = secrets['client_id']
     client_secret = secrets['client_secret']
     user_agent = secrets['user_agent']
-    connection_string = secrets['connection_string']
+    connection_string = secrets['connection_string'] # for connecting to postgresql db
+    # connection_string = secrets['aws_connection_string'] # for connection to MySQL db on AWS
 
 def get_articles():
     reddit = praw.Reddit(client_id=client_id,
@@ -60,10 +64,12 @@ def get_articles():
                         'content': content
                     }
                 })
-            except Exception as e:
-                print(e)
-                print(url)
 
+            except Exception as e:
+                logfile.write(f'error with URL: {url}\n')
+                logfile.write(f'{e}\n')
+
+    logfile.write(f'retrieved {len(posts.keys())} articles\n')
     return posts
 
 def convert_to_dataframe(posts):
@@ -88,16 +94,21 @@ def insert_into_db(df):
     db = create_engine(connection_string)
 
     # remove any records from the dataframe that are already in the database
-    ids = pd.read_sql('SELECT DISTINCT post_id FROM NAP.article', con=db)
+    # ids = pd.read_sql('SELECT DISTINCT post_id FROM NAP.article', con=db) # old query for MySQL db
+    ids = pd.read_sql('SELECT DISTINCT post_id FROM news_article', con=db)
     ids = ids['post_id'].tolist()
 
     df = df[~df['post_id'].isin(ids)].reset_index(drop=True)
 
     # don't try to insert if the dataframe is empty
     if df.empty:
+        logfile.write('no data to insert\n')
         return
 
-    df.to_sql('article', con=db, if_exists='append', index=False)
+    # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
+    df.to_sql('news_article', con=db, if_exists='append', index=False)
+    logfile.write('inserted\n')
+
 
 def main(event=None, context=None):
     try:
@@ -105,11 +116,12 @@ def main(event=None, context=None):
         df = convert_to_dataframe(posts)
         insert_into_db(df)
 
-        return 'success'
+        logfile.write('success\n')
     except:
-        return 'failed'
+        logfile.write('failed\n')
 
 # driver code
 start_time = datetime.now()
 main()
-print(datetime.now() - start_time)
+logfile.write(f'\nTotal run time: {datetime.now() - start_time}\n')
+logfile.close()
