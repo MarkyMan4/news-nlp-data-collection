@@ -27,9 +27,6 @@ def get_articles():
 
     posts = {}
     for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=10)):
-
-        # if i % 10 == 0: print(i)
-
         # skip over the first item since it's just a discussion thread on the subreddit
         if i > 0:
             post_title = submission.title
@@ -45,6 +42,11 @@ def get_articles():
 
             match = re.search('//[a-z]+\.[a-z]+', url).group(0)
             publisher = match[match.index('.') + 1 : ]
+
+            # some URLs don't have a 'www' or something in front of the site name
+            # so this fixes that by just taking the string after '//' and before '.'
+            if publisher in ['com', '.net', 'edu', 'org', 'gov', 'mil']: # covers most extensions I see
+                publisher = match[2:match.index('.')]
 
             # put a try/except here because parsing the article will sometimes return a 403 error
             try: 
