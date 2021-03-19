@@ -1,3 +1,4 @@
+import re
 import praw
 import json
 import newspaper
@@ -36,8 +37,14 @@ def get_articles():
             score = submission.score
             sub_id = submission.id
 
-            paper = newspaper.build(url)
-            publisher = paper.brand
+            # VM runs out of memory when I do this, instead, just use a regex to get the
+            # publisher from the url
+
+            # paper = newspaper.build(url)
+            # publisher = paper.brand
+
+            match = re.search('//[a-z]+\.[a-z]+', url).group(0)
+            publisher = match[match.index('.') + 1 : ]
 
             # put a try/except here because parsing the article will sometimes return a 403 error
             try: 
