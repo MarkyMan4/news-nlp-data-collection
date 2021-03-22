@@ -11,7 +11,4 @@ with open('secrets.json') as file:
 
 db = create_engine(connection_string)
 articles = pd.read_csv('articles.csv')
-articles = articles.drop(columns='id')
-articles = articles[articles['content'].str.len() > 0]
-articles = articles[articles['headline'].str.len() > 0]
 articles.to_sql('news_article', con=db, if_exists='append', index=False)
