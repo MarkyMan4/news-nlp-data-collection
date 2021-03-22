@@ -91,6 +91,13 @@ def convert_to_dataframe(posts):
     df = pd.DataFrame(data=posts).transpose().reset_index()
     df = df.rename(columns={'index': 'post_id'})
 
+    # remove null values for content and headline to satisfy db constraints
+    df = df[df['content'].str.len() > 0]
+    df = df[df['headline'].str.len() > 0]
+
+    # if the date_published is null, fill it in with the current date
+    df['date_published'].fillna(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), inplace=True)
+
     return df
 
 def insert_into_db(df):
@@ -116,6 +123,7 @@ def insert_into_db(df):
 
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
+    print(df)
     logfile.write('inserted\n')
 
 
