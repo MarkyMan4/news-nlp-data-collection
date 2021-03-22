@@ -123,7 +123,6 @@ def insert_into_db(df):
 
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
-    print(df)
     logfile.write('inserted\n')
 
 
