@@ -9,7 +9,7 @@ from datetime import datetime
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
 
-logfile.write('starting\n\n')
+logfile.write('starting\n')
 
 with open('secrets.json') as file:
     secrets = json.load(file)
@@ -123,7 +123,7 @@ def insert_into_db(df):
 
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
-    logfile.write('inserted\n')
+    logfile.write(f'inserted {len(df)} records\n')
 
 
 def main(event=None, context=None):
@@ -139,5 +139,5 @@ def main(event=None, context=None):
 # driver code
 start_time = datetime.now()
 main()
-logfile.write(f'\nTotal run time: {datetime.now() - start_time}\n')
+logfile.write(f'Total run time: {datetime.now() - start_time}\n')
 logfile.close()
