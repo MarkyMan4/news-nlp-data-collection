@@ -100,12 +100,12 @@ def convert_to_dataframe(posts):
 
     return df
 
-def insert_into_db(df):
+def remove_duplicates(df):
     """
-    inserts a dataframe into the article table
-    
-    Arguments:
-        df {[type]} -- [description]
+    Remove records from the DataFrame that already exit in the database.
+
+    Args:
+        df (pd.DataFrame): articles collected
     """
     db = create_engine(connection_string)
 
@@ -116,21 +116,46 @@ def insert_into_db(df):
 
     df = df[~df['post_id'].isin(ids)].reset_index(drop=True)
 
-    # don't try to insert if the dataframe is empty
-    if df.empty:
-        logfile.write('no data to insert\n')
-        return
+    return df
+
+def insert_into_news_article(df):
+    """
+    inserts a dataframe into the news_article table
+    
+    Arguments:
+        df {[type]} -- [description]
+    """
+    db = create_engine(connection_string)
 
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
     logfile.write(f'inserted {len(df)} records\n')
 
+def insert_into_news_articlenlp(df):
+    """
+    Performs sentiment analysis to find sentiment and subjectivity.
+    Uses trained model to identify topic of article.
+    Inserts NLP data into the news_articlenlp table.
+
+    Args:
+        df ([type]): [description]
+    """
+
+    # todo: add code from notebooks for doing natural language processing
+
+    return
 
 def main(event=None, context=None):
     try:
         posts = get_articles()
         df = convert_to_dataframe(posts)
-        insert_into_db(df)
+        df = remove_duplicates(df)
+
+        if not df.empty:
+            insert_into_news_article(df)
+            # insert_into_news_articlenlp(df)
+        else:
+            logfile.write('no data to insert\n')
 
         logfile.write('success\n')
     except:
