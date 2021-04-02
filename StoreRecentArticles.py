@@ -6,6 +6,7 @@ from newspaper import Article
 import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
+from textblob import TextBlob
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
 
@@ -20,7 +21,15 @@ with open('secrets.json') as file:
     connection_string = secrets['connection_string'] # for connecting to postgresql db
     # connection_string = secrets['aws_connection_string'] # for connection to MySQL db on AWS
 
-def get_articles():
+db = create_engine(connection_string) # create connection for database
+
+def get_articles() -> dict:
+    """
+    Use the Reddit API to get recently posted news articles
+
+    Returns:
+        dict: Dictionary of news articles
+    """
     reddit = praw.Reddit(client_id=client_id,
                         client_secret=client_secret,
                         user_agent=user_agent)
@@ -81,12 +90,15 @@ def get_articles():
     logfile.write(f'retrieved {len(posts.keys())} articles\n')
     return posts
 
-def convert_to_dataframe(posts):
+def convert_to_dataframe(posts) -> pd.DataFrame:
     """
     converts a dictionary of posts to a dataframe to be inserted into table
     
     Arguments:
         posts {dict} -- dictionary of posts from reddit
+
+    Returns:
+        pd.DataFrame: Posts represented as a dataframe
     """
     df = pd.DataFrame(data=posts).transpose().reset_index()
     df = df.rename(columns={'index': 'post_id'})
@@ -100,15 +112,16 @@ def convert_to_dataframe(posts):
 
     return df
 
-def remove_duplicates(df):
+def remove_duplicates(df) -> pd.DataFrame:
     """
     Remove records from the DataFrame that already exit in the database.
 
     Args:
         df (pd.DataFrame): articles collected
-    """
-    db = create_engine(connection_string)
 
+    Returns:
+        pd.DataFrame: Articles that don't yet exist in news_article
+    """
     # remove any records from the dataframe that are already in the database
     # ids = pd.read_sql('SELECT DISTINCT post_id FROM NAP.article', con=db) # old query for MySQL db
     ids = pd.read_sql('SELECT DISTINCT post_id FROM news_article', con=db)
@@ -125,11 +138,70 @@ def insert_into_news_article(df):
     Arguments:
         df {[type]} -- [description]
     """
-    db = create_engine(connection_string)
-
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
     logfile.write(f'inserted {len(df)} records\n')
+
+def find_articles_not_in_news_articlenlp() -> pd.DataFrame:
+    """
+    Finds articles that do not have an entry in news_articlenlp.
+    These are returned so that NLP can be performed on them and 
+    they can be added to news_articlenlp.
+
+    Returns:
+        pd.DataFrame: Articles in news_article that aren't in news_articlenlp
+    """
+    articles_without_nlp = pd.read_sql(
+        """
+            select id from news_article
+            except
+            select article_id as id from news_articlenlp
+        """,
+        con=db
+    )
+
+    # build the query
+    ids = tuple(articles_without_nlp['id'].tolist()) # query requires a tuple
+    sql = f'select * from news_article where id in {ids}'
+
+    # use ids from previous query to get articles that need sentiment
+    articles_for_nlp = pd.read_sql(sql, con=db)
+
+    return articles_for_nlp
+
+def perform_nlp(df) -> pd.DataFrame:
+    """
+    Do sentiment analysis and topic modeling for the articles provided.
+
+    Args:
+        df (pd.DataFrame): Articles from news_article that aren't in news_articlenlp
+
+    Returns:
+        pd.DataFrame: Results of sentiment analysis. This dataframe should contain the columns
+           sentiment, subjectviity, article_id and topic_id.          
+    """
+    results = {
+        'article_id': [],
+        'sentiment': [],
+        'subjectivity': []
+    }
+
+    # find sentiment and subjectivity of each article
+    sentiments = []
+    subjectivities = []
+
+    for i in range(len(df)):
+        results['article_id'].append(df.iloc[i]['id'])
+        
+        blob = TextBlob(df.iloc[i]['content'])
+        results['sentiment'].append(blob.sentiment.polarity)
+        results['subjectivity'].append(blob.sentiment.subjectivity)
+        
+    article_nlp = pd.DataFrame(results)
+
+    # do topic modeling
+
+    return
 
 def insert_into_news_articlenlp(df):
     """
@@ -140,10 +212,8 @@ def insert_into_news_articlenlp(df):
     Args:
         df ([type]): [description]
     """
-
-    # todo: add code from notebooks for doing natural language processing
-
-    return
+    
+    pass
 
 def main(event=None, context=None):
     try:
@@ -153,7 +223,8 @@ def main(event=None, context=None):
 
         if not df.empty:
             insert_into_news_article(df)
-            # insert_into_news_articlenlp(df)
+            articles_for_sentiment = find_articles_not_in_news_articlenlp()
+            # insert_into_news_articlenlp(articles_for_sentiment)
         else:
             logfile.write('no data to insert\n')
 
