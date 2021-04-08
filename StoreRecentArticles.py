@@ -284,27 +284,27 @@ def insert_into_news_articlenlp(df: pd.DataFrame):
     logfile.write(f'inserted {len(df)} records into news_articlenlp\n')
 
 def main(event=None, context=None):
-    # try:
-    posts = get_articles()
-    df = convert_to_dataframe(posts)
-    df = remove_duplicates(df)
+    try:
+        posts = get_articles()
+        df = convert_to_dataframe(posts)
+        df = remove_duplicates(df)
 
-    if not df.empty:
-        insert_into_news_article(df)
-    else:
-        logfile.write('no data to insert into news_article\n')
+        if not df.empty:
+            insert_into_news_article(df)
+        else:
+            logfile.write('no data to insert into news_article\n')
 
-    articles_for_nlp = find_articles_not_in_news_articlenlp()
+        articles_for_nlp = find_articles_not_in_news_articlenlp()
 
-    if not articles_for_nlp.empty:
-        article_nlp = perform_nlp(articles_for_nlp)
-        insert_into_news_articlenlp(article_nlp)
-    else:
-        logfile.write('no data to insert into news_articlenlp\n')
+        if not articles_for_nlp.empty:
+            article_nlp = perform_nlp(articles_for_nlp)
+            insert_into_news_articlenlp(article_nlp)
+        else:
+            logfile.write('no data to insert into news_articlenlp\n')
 
-    logfile.write('success\n')
-    # except:
-    #     logfile.write('failed\n')
+        logfile.write('success\n')
+    except:
+        logfile.write('failed\n')
 
 # driver code
 start_time = datetime.now()
