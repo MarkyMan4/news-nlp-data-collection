@@ -7,11 +7,16 @@ import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
 from textblob import TextBlob
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from gensim.corpora import Dictionary
+from gensim.models import LdaMulticore
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
-
 logfile.write('starting\n')
 
+# load the secrets for Reddit and the database
 with open('secrets.json') as file:
     secrets = json.load(file)
 
@@ -21,7 +26,11 @@ with open('secrets.json') as file:
     connection_string = secrets['connection_string'] # for connecting to postgresql db
     # connection_string = secrets['aws_connection_string'] # for connection to MySQL db on AWS
 
-db = create_engine(connection_string) # create connection for database
+# create connection for database
+db = create_engine(connection_string)
+
+# load the trained LDA model for topic modeling
+model = LdaMulticore.load('models/news_lda_model')
 
 def get_articles() -> dict:
     """
@@ -112,7 +121,7 @@ def convert_to_dataframe(posts) -> pd.DataFrame:
 
     return df
 
-def remove_duplicates(df) -> pd.DataFrame:
+def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """
     Remove records from the DataFrame that already exit in the database.
 
@@ -131,7 +140,7 @@ def remove_duplicates(df) -> pd.DataFrame:
 
     return df
 
-def insert_into_news_article(df):
+def insert_into_news_article(df: pd.DataFrame):
     """
     inserts a dataframe into the news_article table
     
@@ -140,7 +149,7 @@ def insert_into_news_article(df):
     """
     # df.to_sql('article', con=db, if_exists='append', index=False) # article was the table in MySQL
     df.to_sql('news_article', con=db, if_exists='append', index=False)
-    logfile.write(f'inserted {len(df)} records\n')
+    logfile.write(f'inserted {len(df)} records into news_article\n')
 
 def find_articles_not_in_news_articlenlp() -> pd.DataFrame:
     """
@@ -169,7 +178,62 @@ def find_articles_not_in_news_articlenlp() -> pd.DataFrame:
 
     return articles_for_nlp
 
-def perform_nlp(df) -> pd.DataFrame:
+def preprocess(article: str) -> list:
+    """
+    Preprocess a news article for topic modeling.
+    This involves removing stop words and any words less than
+    three characters. It also word tokenizes sentences and 
+    lemmatizes each word.
+
+    Args:
+        article (str): Article to preprocess
+
+    Returns:
+        list: list of lowercase, lemmatized tokens from the article
+    """
+    stop_words = stopwords.words('english')
+    lemmatizer = WordNetLemmatizer()
+
+    tokens = word_tokenize(article.lower()) # make all articles lower case
+    words = [] # words resulting from applying the filters
+
+    for token in tokens:
+        if len(token) > 3 and token not in stop_words:
+            words.append(lemmatizer.lemmatize(token))
+    
+    return words
+
+def predict_topic(article: str) -> int:
+    """
+    Use the trained LDA model to predict the topic of the given article.
+
+    Args:
+        preprocessed_article (str): article to predict the topic for
+
+    Returns:
+        int: predicted topic
+    """
+    preprocessed = preprocess(article)
+
+    # create bag of words with preprocessed article
+    bow = model.id2word.doc2bow(preprocessed)
+
+    # make prediction
+    pred = model[bow]
+
+    # find the topic with the best match - predictions are given 
+    # as a list of tuples with the form (topic_num, score)
+    predicted_topic = pred[0][0]
+    best_match = pred[0][1]
+
+    for p in pred:
+        if p[1] > best_match:
+            predicted_topic = p[0]
+            best_match = p[1]
+
+    return predicted_topic
+
+def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
     """
     Do sentiment analysis and topic modeling for the articles provided.
 
@@ -181,29 +245,33 @@ def perform_nlp(df) -> pd.DataFrame:
            sentiment, subjectviity, article_id and topic_id.          
     """
     results = {
-        'article_id': [],
         'sentiment': [],
-        'subjectivity': []
+        'subjectivity': [],
+        'article_id': [],
+        'topic': []
     }
 
-    # find sentiment and subjectivity of each article
     sentiments = []
     subjectivities = []
 
     for i in range(len(df)):
         results['article_id'].append(df.iloc[i]['id'])
         
+        # get the polarity and subjectivity
         blob = TextBlob(df.iloc[i]['content'])
         results['sentiment'].append(blob.sentiment.polarity)
         results['subjectivity'].append(blob.sentiment.subjectivity)
-        
+
+        # get the predicted topic
+        article_content = df.iloc[i]['content']
+        topic = predict_topic(article_content)
+        results['topic'].append(topic)
+
     article_nlp = pd.DataFrame(results)
 
-    # do topic modeling
+    return article_nlp
 
-    return
-
-def insert_into_news_articlenlp(df):
+def insert_into_news_articlenlp(df: pd.DataFrame):
     """
     Performs sentiment analysis to find sentiment and subjectivity.
     Uses trained model to identify topic of article.
@@ -212,25 +280,31 @@ def insert_into_news_articlenlp(df):
     Args:
         df ([type]): [description]
     """
-    
-    pass
+    df.to_sql('news_articlenlp', con=db, if_exists='append', index=False)
+    logfile.write(f'inserted {len(df)} records into news_articlenlp\n')
 
 def main(event=None, context=None):
-    try:
-        posts = get_articles()
-        df = convert_to_dataframe(posts)
-        df = remove_duplicates(df)
+    # try:
+    posts = get_articles()
+    df = convert_to_dataframe(posts)
+    df = remove_duplicates(df)
 
-        if not df.empty:
-            insert_into_news_article(df)
-            articles_for_sentiment = find_articles_not_in_news_articlenlp()
-            # insert_into_news_articlenlp(articles_for_sentiment)
-        else:
-            logfile.write('no data to insert\n')
+    if not df.empty:
+        insert_into_news_article(df)
+    else:
+        logfile.write('no data to insert into news_article\n')
 
-        logfile.write('success\n')
-    except:
-        logfile.write('failed\n')
+    articles_for_nlp = find_articles_not_in_news_articlenlp()
+
+    if not articles_for_nlp.empty:
+        article_nlp = perform_nlp(articles_for_nlp)
+        insert_into_news_articlenlp(article_nlp)
+    else:
+        logfile.write('no data to insert into news_articlenlp\n')
+
+    logfile.write('success\n')
+    # except:
+    #     logfile.write('failed\n')
 
 # driver code
 start_time = datetime.now()
