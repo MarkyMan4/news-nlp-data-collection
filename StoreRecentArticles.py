@@ -162,21 +162,14 @@ def find_articles_not_in_news_articlenlp() -> pd.DataFrame:
     """
     articles_without_nlp = pd.read_sql(
         """
-            select id from news_article
-            except
-            select article_id as id from news_articlenlp
+        select *
+        from news_article
+        where id not in (select article_id from news_articlenlp)
         """,
         con=db
     )
 
-    # build the query
-    ids = tuple(articles_without_nlp['id'].tolist()) # query requires a tuple
-    sql = f'select * from news_article where id in {ids}'
-
-    # use ids from previous query to get articles that need sentiment
-    articles_for_nlp = pd.read_sql(sql, con=db)
-
-    return articles_for_nlp
+    return articles_without_nlp
 
 def preprocess(article: str) -> list:
     """
