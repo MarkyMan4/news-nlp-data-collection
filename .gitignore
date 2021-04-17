@@ -148,3 +148,5 @@ turnin
 inserts.txt
 QueryDatabase.py
 secrets.json
+logs/
+testing/
