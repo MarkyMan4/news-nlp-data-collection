@@ -23,6 +23,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
 import paramiko
+from remote import RemoteConnection
 
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
@@ -36,7 +37,10 @@ with open('secrets.json') as file:
     client_secret = secrets['client_secret']
     user_agent = secrets['user_agent']
     connection_string = secrets['connection_string'] # for connecting to postgresql db
-    # connection_string = secrets['aws_connection_string'] # for connection to MySQL db on AWS
+    server = secrets['compute_server']
+    compute_username = secrets['compute_username']
+    compute_password = secrets['compute_password']
+    remote_scp_path = secrets['remote_scp_path'] # path for copying and getting files from the server
 
 # create connection for database
 db = create_engine(connection_string)
@@ -191,7 +195,25 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Results of sentiment analysis. This dataframe should contain the columns
            sentiment, subjectviity, article_id and topic_id.          
     """
-    pass
+    # save as file so it can be copied to server
+    filename = 'articles_for_nlp.csv'
+    df.to_csv(filename, index=False)
+
+    remote_con = RemoteConnection(server, compute_username, compute_password)
+    
+    # copy file to server
+    remote_con.copy_file_to_server(filename, f'{remote_scp_path}{filename}')
+
+    # run the script to process the file and wait for it to complete
+    remote_con.execute_command('python3 NewsNLP/nlp.py')
+
+    # copy the result file back to this server
+    remote_con.get_file_from_server(f'{remote_scp_path}nlp_result.csv')
+    result = pd.read_csv('nlp_result.csv')
+
+    remote_con.close_connection()
+
+    return result
 
 def insert_into_news_articlenlp(df: pd.DataFrame):
     """

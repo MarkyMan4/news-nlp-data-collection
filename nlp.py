@@ -4,6 +4,7 @@
     perform the natural language processing tasks.
 """
 
+import pandas as pd
 from textblob import TextBlob
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -12,7 +13,7 @@ from gensim.corpora import Dictionary
 from gensim.models import LdaMulticore
 
 
-model = LdaMulticore.load('models/news_lda_model')
+model = LdaMulticore.load('NewsNLP/models/news_lda_model')
 
 def preprocess(article: str) -> list:
     """
@@ -107,4 +108,7 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
 
     return article_nlp
 
-# TODO: read in file that was copied to this server, then pass it to perform_nlp()
+# read in file that was copied to this server, then pass it to perform_nlp()
+articles = pd.read_csv('NewsNLP/articles_for_nlp.csv')
+nlp_result = perform_nlp(articles)
+nlp_result.to_csv('NewsNLP/nlp_result.csv', index=False)
