@@ -2,6 +2,16 @@
     This script is for doing data collection and storing in news_article.
     It delegates the NLP work to the compute server since the VM does not
     have enough RAM to handle the machine learning portion.
+
+    Steps:
+        1. collect articles from reddit
+        2. insert articles into news_article
+        3. find which articles need to have an entry in news_articlenlp
+            3.1. save these articles as a csv
+            3.2. copy csv to the compute server
+        4. invoke script on compute server to perform nlp
+        5. retrieve results of nlp script from compute 
+        6. store nlp results in news_articlenlp
 """
 
 import re
@@ -12,6 +22,7 @@ from newspaper import Article
 import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
+import paramiko
 
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
