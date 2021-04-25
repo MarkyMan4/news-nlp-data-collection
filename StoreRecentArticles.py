@@ -23,7 +23,6 @@ from newspaper import Article
 import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
-import paramiko
 from remote import RemoteConnection
 
 
