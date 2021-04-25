@@ -14,6 +14,7 @@
         6. store nlp results in news_articlenlp
 """
 
+import os
 import re
 import praw
 import json
@@ -195,23 +196,28 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Results of sentiment analysis. This dataframe should contain the columns
            sentiment, subjectviity, article_id and topic_id.          
     """
+    input_file = 'articles_for_nlp.csv'
+    output_file = 'nlp_result.csv'
+
     # save as file so it can be copied to server
-    filename = 'articles_for_nlp.csv'
-    df.to_csv(filename, index=False)
+    df.to_csv(input_file, index=False)
 
     remote_con = RemoteConnection(server, compute_username, compute_password)
     
     # copy file to server
-    remote_con.copy_file_to_server(filename, f'{remote_scp_path}{filename}')
+    remote_con.copy_file_to_server(input_file, f'{remote_scp_path}{input_file}')
 
     # run the script to process the file and wait for it to complete
     remote_con.execute_command('python3 NewsNLP/nlp.py')
 
     # copy the result file back to this server
-    remote_con.get_file_from_server(f'{remote_scp_path}nlp_result.csv')
-    result = pd.read_csv('nlp_result.csv')
+    remote_con.get_file_from_server(f'{remote_scp_path}{output_file}')
+    result = pd.read_csv(output_file)
 
+    # close connection and delete CSVs
     remote_con.close_connection()
+    os.remove(input_file)
+    os.remove(output_file)
 
     return result
 
