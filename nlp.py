@@ -4,9 +4,10 @@
     perform the natural language processing tasks.
 """
 
+import math
 import pandas as pd
 from textblob import TextBlob
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from gensim.corpora import Dictionary
@@ -70,6 +71,113 @@ def predict_topic(article: str) -> int:
 
     return predicted_topic
 
+def get_unique_terms(tokens: list) -> list:
+    # find the unique terms, then count how many times each term appears
+    unique_terms = []
+
+    for token in tokens:
+        if token not in unique_terms:
+            unique_terms.append(token)
+
+    return unique_terms
+
+def get_term_frequency(unique_terms: list, all_tokens: list) -> dict:
+    # find how many times each term appears
+    term_counts = {}
+    for term in unique_terms:
+        term_counts.update({term: 0})
+
+    for token in all_tokens:
+        term_counts[token] += 1
+
+    # find term frequencies by diving # of times each term appears by the term counts
+    term_freqs = {}
+    num_terms = len(all_tokens)
+
+    for term in unique_terms:
+        term_freqs.update({term: term_counts[term] / num_terms})
+
+    return term_freqs
+
+def get_inverse_document_frequency(content: str, unique_terms: list) -> dict:
+    # split content into sentences
+    sentences = sent_tokenize(content)
+    num_sentences = len(sentences)
+
+    # split each sentence into word tokens, no need to remove stop words here
+    sentences = [word_tokenize(sent) for sent in sentences]
+
+    # find number of sentences containing each term
+    sentence_freqs = {}
+
+    for term in unique_terms:
+        sentence_freqs.update({term: 0})
+        
+    for term in unique_terms:
+        for sent in sentences:
+            if term in sent:
+                sentence_freqs[term] += 1
+
+    # compute inverse document frequency for each term
+    idf = {}
+
+    for term in unique_terms:
+        idf.update({
+            term: math.log(num_sentences / sentence_freqs[term])
+        })
+
+    return idf
+
+def get_tf_idf(unique_terms: list, term_freqs: dict, idf: dict) -> dict:
+    # find tfidf for each term
+    tfidf = {}
+
+    for term in unique_terms:
+        tfidf.update({
+            term: term_freqs[term] * idf[term]
+        })
+
+    return tfidf
+
+def find_keywords(content: str) -> str:
+    """
+    Find the top ten key words using the TF-IDF calculation.
+
+    Term Frequency = (# of times term appears) / (total # of terms in article)
+    Inverse Document Frequency = log(# of sentences / # of sentences with the term)
+    TF-IDF - term frequency * inverse document frequency
+
+    Higher TF-IDF score means the term is more important.
+
+    Args:
+        content (str): content from news article to find keywords for
+
+    Returns:
+        str: semi-colon separated list of keywords
+    """
+    # tokenize the content and remove stopwords and punctuation
+    tokens = word_tokenize(content)
+    tokens = [t for t in tokens if t not in stopwords.words('english') and len(t) >= 3]
+
+    unique_terms = get_unique_terms(tokens)
+
+    # get TF and IDF then calculate TF-IDF
+    term_freqs = get_term_frequency(unique_terms, tokens)
+    idf = get_inverse_document_frequency(content, unique_terms)
+    tfidf_scores = get_tf_idf(unique_terms, term_freqs, idf)
+
+    # take the top 10 words with highest TF-IDF score
+    # swap keys and values so the list can be sorted by TF-IDF score easily
+    swapped_key_and_vals = []
+    for item in tfidf_scores.items():
+        swapped_key_and_vals.append((item[1], item[0]))
+
+    # take the last ten items in reversed order so it's sorted in descending order
+    top_ten = sorted(swapped_key_and_vals)[-1:-11:-1]
+    top_ten_terms = [item[1] for item in top_ten]
+
+    return ';'.join(top_ten_terms) # list should be semi-colon separated values
+
 def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
     """
     Do sentiment analysis and topic modeling for the articles provided.
@@ -85,11 +193,9 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
         'sentiment': [],
         'subjectivity': [],
         'article_id': [],
-        'topic': []
+        'topic': [],
+        'keywords': []
     }
-
-    sentiments = []
-    subjectivities = []
 
     for i in range(len(df)):
         results['article_id'].append(df.iloc[i]['id'])
@@ -103,6 +209,9 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
         article_content = df.iloc[i]['content']
         topic = predict_topic(article_content)
         results['topic'].append(topic)
+
+        # find the keywords for the article using TF-IDF
+        results['keywords'].append(find_keywords(df.iloc[i]['content']))
 
     article_nlp = pd.DataFrame(results)
 
