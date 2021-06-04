@@ -156,8 +156,13 @@ def find_keywords(content: str) -> str:
         str: semi-colon separated list of keywords
     """
     # tokenize the content and remove stopwords and punctuation
-    tokens = word_tokenize(content)
-    tokens = [t for t in tokens if t not in stopwords.words('english') and len(t) >= 3]
+    sentences = sent_tokenize(content)
+    tokens = []
+    # sent tokenize first so the way it creates tokens is consistent with how it's done when computing IDF
+    for sent in sentences:
+        tokens += word_tokenize(sent)
+    
+    tokens = [t for t in tokens if t not in stopwords.words('english') and len(t) > 3]
 
     unique_terms = get_unique_terms(tokens)
 
