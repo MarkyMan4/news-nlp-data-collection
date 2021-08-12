@@ -122,8 +122,14 @@ def get_inverse_document_frequency(content: str, unique_terms: list) -> dict:
     idf = {}
 
     for term in unique_terms:
+        term_val = 0
+
+        # avoid division by 0
+        if sentence_freqs[term] != 0:
+            term_val = math.log(num_sentences / sentence_freqs[term])
+
         idf.update({
-            term: math.log(num_sentences / sentence_freqs[term])
+            term: term_val
         })
 
     return idf
@@ -162,7 +168,7 @@ def find_keywords(content: str) -> str:
     for sent in sentences:
         tokens += word_tokenize(sent)
     
-    tokens = [t for t in tokens if t not in stopwords.words('english') and len(t) > 3]
+    tokens = [t for t in tokens if t.lower() not in stopwords.words('english') and len(t) >= 3 and t.lower() != 'said']
 
     unique_terms = get_unique_terms(tokens)
 

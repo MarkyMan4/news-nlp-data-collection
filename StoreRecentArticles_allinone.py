@@ -2,6 +2,8 @@
     This script is for doing data collection and NLP all in one script.
     This can be used if the server has enough memory to handle loading
     the LDA model.
+
+    This "all in one" version is meant to be run locally for populating my dev database.
 """
 
 import re
@@ -51,7 +53,7 @@ def get_articles() -> dict:
                         user_agent=user_agent)
 
     posts = {}
-    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=10)):
+    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=100)):
         # skip over the first item since it's just a discussion thread on the subreddit
         if i > 0:
             post_title = submission.title
@@ -65,7 +67,14 @@ def get_articles() -> dict:
             # paper = newspaper.build(url)
             # publisher = paper.brand
 
-            match = re.search('//[a-z]+\.[a-z]+', url).group(0)
+            match = re.search('//[a-z0-9]+\.[a-z]+', url)
+
+            # the regex isn't handling all possible URLs at the moment, just skip them for now if it didn't match
+            if match:
+                match = match.group(0)
+            else:
+                continue
+
             publisher = match[match.index('.') + 1 : ]
 
             # some URLs don't have a 'www' or something in front of the site name
@@ -102,6 +111,8 @@ def get_articles() -> dict:
             except Exception as e:
                 logfile.write(f'error with URL: {url}\n')
                 logfile.write(f'{e}\n')
+
+    print('done')
 
     logfile.write(f'retrieved {len(posts.keys())} articles\n')
     return posts
@@ -284,8 +295,14 @@ def get_inverse_document_frequency(content: str, unique_terms: list) -> dict:
     idf = {}
 
     for term in unique_terms:
+        term_val = 0
+
+        # avoid division by 0
+        if sentence_freqs[term] != 0:
+            term_val = math.log(num_sentences / sentence_freqs[term])
+
         idf.update({
-            term: math.log(num_sentences / sentence_freqs[term])
+            term: term_val
         })
 
     return idf
@@ -313,7 +330,7 @@ def find_keywords(content: str) -> str:
     """
     # tokenize the content and remove stopwords and punctuation
     tokens = word_tokenize(content)
-    tokens = [t for t in tokens if t not in stopwords.words('english') and len(t) >= 3]
+    tokens = [t for t in tokens if t.lower() not in stopwords.words('english') and len(t) >= 3 and t.lower() != 'said']
 
     unique_terms = get_unique_terms(tokens)
 
@@ -385,28 +402,28 @@ def insert_into_news_articlenlp(df: pd.DataFrame):
     df.to_sql('news_articlenlp', con=db, if_exists='append', index=False)
     logfile.write(f'inserted {len(df)} records into news_articlenlp\n')
 
-def main(event=None, context=None):
-    try:
-        posts = get_articles()
-        df = convert_to_dataframe(posts)
-        df = remove_duplicates(df)
+def main():
+    # try:
+    posts = get_articles()
+    df = convert_to_dataframe(posts)
+    df = remove_duplicates(df)
 
-        if not df.empty:
-            insert_into_news_article(df)
-        else:
-            logfile.write('no data to insert into news_article\n')
+    if not df.empty:
+        insert_into_news_article(df)
+    else:
+        logfile.write('no data to insert into news_article\n')
 
-        articles_for_nlp = find_articles_not_in_news_articlenlp()
+    articles_for_nlp = find_articles_not_in_news_articlenlp()
 
-        if not articles_for_nlp.empty:
-            article_nlp = perform_nlp(articles_for_nlp)
-            insert_into_news_articlenlp(article_nlp)
-        else:
-            logfile.write('no data to insert into news_articlenlp\n')
+    if not articles_for_nlp.empty:
+        article_nlp = perform_nlp(articles_for_nlp)
+        insert_into_news_articlenlp(article_nlp)
+    else:
+        logfile.write('no data to insert into news_articlenlp\n')
 
-        logfile.write('success\n')
-    except:
-        logfile.write('failed\n')
+    logfile.write('success\n')
+    # except:
+    #     logfile.write('failed\n')
 
 # driver code
 start_time = datetime.now()

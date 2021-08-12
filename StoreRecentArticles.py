@@ -71,7 +71,14 @@ def get_articles() -> dict:
             # paper = newspaper.build(url)
             # publisher = paper.brand
 
-            match = re.search('//[a-z]+\.[a-z]+', url).group(0)
+            match = re.search('//[a-z0-9]+\.[a-z]+', url)
+
+            # the regex isn't handling all possible URLs at the moment, just skip them for now if it didn't match
+            if match:
+                match = match.group(0)
+            else:
+                continue
+
             publisher = match[match.index('.') + 1 : ]
 
             # some URLs don't have a 'www' or something in front of the site name
@@ -232,7 +239,7 @@ def insert_into_news_articlenlp(df: pd.DataFrame):
     df.to_sql('news_articlenlp', con=db, if_exists='append', index=False)
     logfile.write(f'inserted {len(df)} records into news_articlenlp\n')
 
-def main(event=None, context=None):
+def main():
     try:
         posts = get_articles()
         df = convert_to_dataframe(posts)
