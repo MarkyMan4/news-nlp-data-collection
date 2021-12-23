@@ -79,7 +79,7 @@ def get_articles() -> dict:
 
             # some URLs don't have a 'www' or something in front of the site name
             # so this fixes that by just taking the string after '//' and before '.'
-            if publisher in ['com', '.net', 'edu', 'org', 'gov', 'mil']: # covers most extensions I see
+            if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil']: # covers most extensions I see
                 publisher = match[2:match.index('.')]
 
             # put a try/except here because parsing the article will sometimes return a 403 error
