@@ -53,7 +53,7 @@ def get_articles() -> dict:
                         user_agent=user_agent)
 
     posts = {}
-    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=100)):
+    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=20)):
         # skip over the first item since it's just a discussion thread on the subreddit
         if i > 0:
             post_title = submission.title
@@ -67,20 +67,20 @@ def get_articles() -> dict:
             # paper = newspaper.build(url)
             # publisher = paper.brand
 
-            match = re.search('//[a-z0-9]+\.[a-z]+', url)
+            match = re.search('//([a-z0-9]+)\.([a-z0-9]+)', url)
 
             # the regex isn't handling all possible URLs at the moment, just skip them for now if it didn't match
-            if match:
-                match = match.group(0)
-            else:
+            if not match:
                 continue
 
-            publisher = match[match.index('.') + 1 : ]
+            publisher = match.group(2)
 
             # some URLs don't have a 'www' or something in front of the site name
-            # so this fixes that by just taking the string after '//' and before '.'
-            if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil']: # covers most extensions I see
-                publisher = match[2:match.index('.')]
+            # so this fixes that by just taking the item in the first group of the regex
+            # the site name could also be something like 'www.gov.uk', so in this case I don't want 'www' to be the publisher.
+            # if the first group is 'www', I'll still keep the second group even if it is net, gov, edu, etc.
+            if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil'] and match.group(1) != 'www': # covers most extensions I see
+                publisher = match.group(1)
 
             # put a try/except here because parsing the article will sometimes return a 403 error
             try: 
