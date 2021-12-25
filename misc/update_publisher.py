@@ -5,7 +5,7 @@
 import pandas as pd
 import re
 
-df = pd.read_csv('data/dev_articles.csv')
+df = pd.read_csv('data/prod_articles.csv')
 update_stmts = []
 
 for i in range(len(df)):
@@ -18,7 +18,7 @@ for i in range(len(df)):
 
     publisher = match.group(2)
 
-    if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil'] and match.group(1) != 'www': # covers most extensions I see
+    if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil', 'ca'] and match.group(1) != 'www': # covers most extensions I see
         publisher = match.group(1)
 
     update_stmts.append(f"update news_article set publisher = '{publisher}' where id = {df.iloc[i]['id']};\n")

@@ -83,7 +83,7 @@ def get_articles() -> dict:
             # so this fixes that by just taking the item in the first group of the regex
             # the site name could also be something like 'www.gov.uk', so in this case I don't want 'www' to be the publisher.
             # if the first group is 'www', I'll still keep the second group even if it is net, gov, edu, etc.
-            if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil'] and match.group(1) != 'www': # covers most extensions I see
+            if publisher in ['com', 'net', 'edu', 'org', 'gov', 'mil', 'ca'] and match.group(1) != 'www': # covers most extensions I see
                 publisher = match.group(1)
 
             # put a try/except here because parsing the article will sometimes return a 403 error
