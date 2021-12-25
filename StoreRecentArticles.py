@@ -71,7 +71,7 @@ def get_articles() -> dict:
             # paper = newspaper.build(url)
             # publisher = paper.brand
 
-            match = re.search('//([a-z0-9]+)\.([a-z0-9]+)', url)
+            match = re.search('//([a-z0-9-]+)\.([a-z0-9-]+)', url)
 
             # the regex isn't handling all possible URLs at the moment, just skip them for now if it didn't match
             if not match:
