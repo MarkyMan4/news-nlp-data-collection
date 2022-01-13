@@ -24,6 +24,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
 from remote import RemoteConnection
+from nlp import process_file
 
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
@@ -57,7 +58,7 @@ def get_articles() -> dict:
                         user_agent=user_agent)
 
     posts = {}
-    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=10)):
+    for i, submission in enumerate(reddit.subreddit('worldnews').hot(limit=20)):
         # skip over the first item since it's just a discussion thread on the subreddit
         if i > 0:
             post_title = submission.title
@@ -208,20 +209,22 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
     # save as file so it can be copied to server
     df.to_csv(input_file, index=False)
 
-    remote_con = RemoteConnection(server, compute_username, compute_password)
+    # remote_con = RemoteConnection(server, compute_username, compute_password)
     
-    # copy file to server
-    remote_con.copy_file_to_server(input_file, f'{remote_scp_path}{input_file}')
+    # # copy file to server
+    # remote_con.copy_file_to_server(input_file, f'{remote_scp_path}{input_file}')
 
-    # run the script to process the file and wait for it to complete
-    remote_con.execute_command('python3 NewsNLP/nlp.py')
+    # # run the script to process the file and wait for it to complete
+    # remote_con.execute_command('python3 NewsNLP/nlp.py')
 
-    # copy the result file back to this server
-    remote_con.get_file_from_server(f'{remote_scp_path}{output_file}')
+    # # copy the result file back to this server
+    # remote_con.get_file_from_server(f'{remote_scp_path}{output_file}')
+
+    process_file(input_file)
     result = pd.read_csv(output_file)
 
     # close connection and delete CSVs
-    remote_con.close_connection()
+    # remote_con.close_connection()
     os.remove(input_file)
     os.remove(output_file)
 
@@ -258,9 +261,10 @@ def main():
         else:
             logfile.write('no data to insert into news_articlenlp\n')
 
-        logfile.write('success\n')
-    except:
-        logfile.write('failed\n')
+            logfile.write('success\n')
+    except Exception as e:
+        logfile.write('failed\n\n')
+        logfile.write(e)
 
 # driver code
 start_time = datetime.now()
