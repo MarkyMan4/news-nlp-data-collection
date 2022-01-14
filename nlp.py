@@ -227,13 +227,3 @@ def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
     article_nlp = pd.DataFrame(results)
 
     return article_nlp
-
-def process_file(path):
-    articles = pd.read_csv(path)
-    nlp_result = perform_nlp(articles)
-    nlp_result.to_csv('nlp_result.csv', index=False)
-
-# read in file that was copied to this server, then pass it to perform_nlp()
-# articles = pd.read_csv('NewsNLP/articles_for_nlp.csv')
-# nlp_result = perform_nlp(articles)
-# nlp_result.to_csv('NewsNLP/nlp_result.csv', index=False)

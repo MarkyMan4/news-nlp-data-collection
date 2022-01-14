@@ -24,7 +24,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from datetime import datetime
 from remote import RemoteConnection
-from nlp import process_file
+from nlp import perform_nlp
 
 
 logfile = open(f'logs/{datetime.now().strftime("%Y-%m-%d %H:%M")}', 'w') # save outputs so I can debug if needed
@@ -191,44 +191,6 @@ def find_articles_not_in_news_articlenlp() -> pd.DataFrame:
     )
 
     return articles_without_nlp
-
-def perform_nlp(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Invoke the script on the compute server to perform the natural language processing.
-
-    Args:
-        df (pd.DataFrame): Articles from news_article that aren't in news_articlenlp
-
-    Returns:
-        pd.DataFrame: Results of sentiment analysis. This dataframe should contain the columns
-           sentiment, subjectviity, article_id and topic_id.          
-    """
-    input_file = 'articles_for_nlp.csv'
-    output_file = 'nlp_result.csv'
-
-    # save as file so it can be copied to server
-    df.to_csv(input_file, index=False)
-
-    # remote_con = RemoteConnection(server, compute_username, compute_password)
-    
-    # # copy file to server
-    # remote_con.copy_file_to_server(input_file, f'{remote_scp_path}{input_file}')
-
-    # # run the script to process the file and wait for it to complete
-    # remote_con.execute_command('python3 NewsNLP/nlp.py')
-
-    # # copy the result file back to this server
-    # remote_con.get_file_from_server(f'{remote_scp_path}{output_file}')
-
-    process_file(input_file)
-    result = pd.read_csv(output_file)
-
-    # close connection and delete CSVs
-    # remote_con.close_connection()
-    os.remove(input_file)
-    os.remove(output_file)
-
-    return result
 
 def insert_into_news_articlenlp(df: pd.DataFrame):
     """
